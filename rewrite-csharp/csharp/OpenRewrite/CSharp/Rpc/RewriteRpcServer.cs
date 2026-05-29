@@ -53,6 +53,7 @@ public class RewriteRpcServer
     private readonly ConcurrentDictionary<string, object?> _recipeAccumulators = new();
     private readonly ConcurrentDictionary<string, ExecutionContext> _executionContexts = new();
     private string? _recipesProjectDir;
+    private readonly string? _recipeInstallDir;
     private JsonRpc? _jsonRpc;
     private DotNetBuildContext? _buildContext;
 
@@ -88,9 +89,10 @@ public class RewriteRpcServer
         jsonRpc.StartListening();
     }
 
-    public RewriteRpcServer(RecipeMarketplace marketplace)
+    public RewriteRpcServer(RecipeMarketplace marketplace, string? recipeInstallDir = null)
     {
         _marketplace = marketplace;
+        _recipeInstallDir = recipeInstallDir;
 
         // Register type name overrides for nagoya types that don't match Java names
         RpcSendQueue.RegisterJavaTypeName(typeof(CsLambda),
@@ -636,7 +638,11 @@ public class RewriteRpcServer
                 return existing;
         }
 
-        _recipesProjectDir = Path.Combine(Path.GetTempPath(), "rewrite-recipes", Guid.NewGuid().ToString("N")[..8]);
+        // Use the caller-supplied recipe install directory when provided (so a
+        // co-located NuGet.config is found by dotnet's project-directory config
+        // walk); otherwise fall back to a unique temp directory.
+        _recipesProjectDir = _recipeInstallDir
+            ?? Path.Combine(Path.GetTempPath(), "rewrite-recipes", Guid.NewGuid().ToString("N")[..8]);
         Directory.CreateDirectory(_recipesProjectDir);
 
         var csprojPath = Path.Combine(_recipesProjectDir, "Recipes.csproj");
@@ -1218,6 +1224,7 @@ public class RewriteRpcServer
     }
 
     public static async Task RunAsync(RecipeMarketplace? marketplace = null,
+        string? recipeInstallDir = null,
         CancellationToken cancellationToken = default)
     {
         marketplace ??= new RecipeMarketplace();
@@ -1246,7 +1253,7 @@ public class RewriteRpcServer
         var handler = new HeaderDelimitedMessageHandler(outputStream, inputStream, formatter);
         using var jsonRpc = new StringErrorDataJsonRpc(handler);
 
-        var server = new RewriteRpcServer(marketplace);
+        var server = new RewriteRpcServer(marketplace, recipeInstallDir);
         server._jsonRpc = jsonRpc;
         _current = server;
         // Allow concurrent request dispatch so reentrant callbacks don't deadlock.

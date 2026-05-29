@@ -191,6 +191,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
         private Duration timeout = Duration.ofSeconds(60);
         private boolean traceRpcMessages;
         private @Nullable Path workingDirectory;
+        private @Nullable Path recipeInstallDir;
         private @Nullable Path profileOutputPath;
 
         public Builder marketplace(RecipeMarketplace marketplace) {
@@ -279,6 +280,20 @@ public class CSharpRewriteRpc extends RewriteRpc {
         }
 
         /**
+         * Directory in which the server creates its recipe project (where
+         * {@code dotnet add package} resolves recipe NuGet packages). Set this so a
+         * caller-written {@code NuGet.config} co-located in the directory is honored
+         * by dotnet's project-directory config discovery.
+         *
+         * @param recipeInstallDir The directory to create the recipe project in
+         * @return This builder
+         */
+        public Builder recipeInstallDir(@Nullable Path recipeInstallDir) {
+            this.recipeInstallDir = recipeInstallDir;
+            return this;
+        }
+
+        /**
          * Enable .NET EventPipe profiling on the C# process. Captures CPU sampling,
          * GC events, sampled allocations, and runtime counters into a {@code .nettrace}
          * file that can be analyzed with {@code dotnet-trace convert}, PerfView, or
@@ -310,7 +325,8 @@ public class CSharpRewriteRpc extends RewriteRpc {
                             dotnetPath.toString(),
                             csharpServerEntry.toAbsolutePath().normalize().toString(),
                             log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
-                            traceRpcMessages ? "--trace-rpc-messages" : null
+                            traceRpcMessages ? "--trace-rpc-messages" : null,
+                            recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize()
                     );
                 }
             } else {
@@ -367,7 +383,8 @@ public class CSharpRewriteRpc extends RewriteRpc {
                     "--project", csproj.toAbsolutePath().normalize().toString(),
                     "--framework", "net10.0",
                     log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
-                    traceRpcMessages ? "--trace-rpc-messages" : null
+                    traceRpcMessages ? "--trace-rpc-messages" : null,
+                    recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize()
             );
         }
 
@@ -393,7 +410,8 @@ public class CSharpRewriteRpc extends RewriteRpc {
             return Stream.of(
                     toolExecutable.toAbsolutePath().normalize().toString(),
                     log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
-                    traceRpcMessages ? "--trace-rpc-messages" : null
+                    traceRpcMessages ? "--trace-rpc-messages" : null,
+                    recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize()
             );
         }
 
